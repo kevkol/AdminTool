@@ -56,11 +56,6 @@
 				<apex:commandButton value="Update"  action="{!updateBatch}" />
 				<apex:commandButton value="Preview query" action="{!previewQueryUpdate}" />
 			</apex:pageBlockSection>
-
-			<apex:pageBlockSection title="Refresh cache">
-				<apex:commandButton value="Refresh cache" action="{!refreshCache}" />
-
-			</apex:pageBlockSection>
 		</apex:pageBlock>
 	</apex:form>
 </apex:page>

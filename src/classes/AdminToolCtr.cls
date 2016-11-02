@@ -26,12 +26,6 @@ public with sharing class AdminToolCtr {
 		
 	}
 
-	public void refreshCache() {
-
-		CacheUtil cache = new CacheUtil();
-		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Cache refresh done.'));
-	}
-
 	public void deleteBatch() {
 
 		Database.executeBatch(new RecordDeleteBatch(sObjectName, whereClause));

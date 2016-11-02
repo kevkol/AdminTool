@@ -19,7 +19,6 @@ private class AdminToolCtrTest {
 		ctr.whereClause = 'Id != null';
 		ctr.sObjectNameUpdate = 'Account';
 		ctr.whereClauseUpdate = 'Id != null';
-		ctr.refreshCache();
 		ctr.deleteBatch();
 		ctr.updateBatch();
 		ctr.previewQuery();	
