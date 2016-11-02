@@ -1,0 +1,66 @@
+<!--
+ * Visualforce page for the admin tool. The Admin tool helps to control generic ORG methods with 
+ * front-end tool.
+ *
+ * @see         AdminTool.cls
+ *
+ * @version     2016-07-06 kevin.kolditz@die-interaktiven.com      first version
+ * 			    
+-->
+
+<apex:page showHeader="true" sidebar="true" controller="AdminToolCtr">
+	
+	<apex:form >
+		<apex:pageBlock title="Admin tool" mode="edit">
+			<apex:pageMessages />
+			<apex:pageBlockSection title="Delete sObject Records">
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="sObject Name" />
+					<apex:inputText value="{!sObjectName}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="WHERE Clause" />
+					<apex:inputText value="{!whereClause}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!previewQueryString}" />
+				</apex:pageBlockSectionItem>				
+				<apex:pageBlockSectionItem >
+				</apex:pageBlockSectionItem>
+				<apex:commandButton value="Delete"  action="{!deleteBatch}" />
+				<apex:commandButton value="Preview query" action="{!previewQuery}" />
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection title="Update sObject Records">
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="sObject Name" />
+					<apex:inputText value="{!sObjectNameUpdate}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="WHERE Clause" />
+					<apex:inputText value="{!whereClauseUpdate}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="Field API Name" />
+					<apex:inputText value="{!fieldToUpdate}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="New value" />
+					<apex:inputText value="{!newValue}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!previewQueryStringUpdate}" />
+				</apex:pageBlockSectionItem>				
+				<apex:pageBlockSectionItem >
+				</apex:pageBlockSectionItem>
+				<apex:commandButton value="Update"  action="{!updateBatch}" />
+				<apex:commandButton value="Preview query" action="{!previewQueryUpdate}" />
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection title="Refresh cache">
+				<apex:commandButton value="Refresh cache" action="{!refreshCache}" />
+
+			</apex:pageBlockSection>
+		</apex:pageBlock>
+	</apex:form>
+</apex:page>
