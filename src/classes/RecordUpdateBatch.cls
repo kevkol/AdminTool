@@ -14,26 +14,44 @@ global without sharing class RecordUpdateBatch implements Database.Batchable<sOb
 
 	// a map with the field name and the value that has to be set
 	global Map<String, Object> fieldsToSetMap { get; set; }
+
+	// the field that has to be copied
+	global String fieldToSetCopy { get; set; }
+
+	// the field with the origin value
+	global String originField { get; set; }
 	
 	global RecordUpdateBatch(String sObjectAPIName, Map<String, Object> fieldsToSetMap) {
 
-		this.sObjectAPIName 	= sObjectAPIName;
-		this.fieldsToSetMap 	= fieldsToSetMap;
+		this.sObjectAPIName = sObjectAPIName;
+		this.fieldsToSetMap = fieldsToSetMap;
+	}	
+
+	global RecordUpdateBatch(String sObjectAPIName, String originField, String fieldToSetCopy, String whereCondition) {
+
+		this.fieldToSetCopy = fieldToSetCopy;
+		this.originField 	= originField;
+		this.sObjectAPIName = sObjectAPIName;
+		this.whereCondition = whereCondition;		
 	}	
 
 	global RecordUpdateBatch(String sObjectAPIName, String whereCondition, Map<String, Object> fieldsToSetMap) {
 
 		this.sObjectAPIName 	= sObjectAPIName;
-		System.debug('this.sObjectAPIName: ' + this.sObjectAPIName);
 		this.whereCondition 	= whereCondition;
-		System.debug('this.whereCondition: ' + this.whereCondition);
 		this.fieldsToSetMap 	= fieldsToSetMap;
-		System.debug('this.fieldsToSetMap: ' + this.fieldsToSetMap);
 	}
 	
 	global Database.QueryLocator start(Database.BatchableContext BC) {
 
-		String query = 'SELECT Id FROM ' + this.sObjectAPIName;
+		String query = 'SELECT Id '; 
+
+		if (this.originField != null) {
+
+			query += ', ' + this.originField;
+		}
+
+		query += ' FROM ' + this.sObjectAPIName;
         
 		if (this.whereCondition != null && this.whereCondition != '') {
 			System.debug('this.whereCondition  ' + this.whereCondition);
@@ -52,21 +70,30 @@ global without sharing class RecordUpdateBatch implements Database.Batchable<sOb
 	global void execute(Database.BatchableContext BC, List<sObject> scope) {
 		try {
 			
-				if (this.fieldsToSetMap != null && !this.fieldsToSetMap.isEmpty()) {
-					for (sObject obj : scope) {
-						// set all relevant fields
+				//if (this.fieldsToSetMap != null && !this.fieldsToSetMap.isEmpty()) {
+				for (sObject obj : scope) {
+					// set all relevant fields
+
+					if(this.fieldsToSetMap != null) {
+
 						for (String field : this.fieldsToSetMap.keySet()) {
+
 							obj.put(field, this.fieldsToSetMap.get(field));
 						}
-					}
+					} else if (this.fieldToSetCopy != null && this.originField != null) {
+
+							obj.put(fieldToSetCopy, obj.get(this.originField));
+					} 
 				}
+				//}
 				
 				update scope;
 
 			} catch (Exception e) {
 
-				LogUtil log = new LogUtil();
-				log.warn('RecordUpdateBatch', 'Error in execute method', e);
+				// Include lines if logUtil is installed
+				// LogUtil log = new LogUtil();
+				// log.warn('RecordUpdateBatch', 'Error in execute method', e);
 		    }
 	}
 	

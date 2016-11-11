@@ -21,6 +21,11 @@ public with sharing class AdminToolCtr {
 	public String fieldToUpdate { get; set; }
 	public Object newValue { get; set; }
 
+	public String sObjectSetCopy { get; set; }
+	public String originField { get; set; }
+	public String fieldToSetCopy { get; set; }
+	public String whereClauseSetCopy { get; set; }
+
 
 	public AdminToolCtr() {
 		
@@ -42,6 +47,12 @@ public with sharing class AdminToolCtr {
 
 		Database.executeBatch(new RecordUpdateBatch(sObjectNameUpdate, whereClauseUpdate, fieldValueMap));
 		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Update initialized.'));
+	}
+
+	public void setCopyBatch() {
+
+		Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseUpdate));
+		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Copy Field Update initialized.'));
 	}
 
 	public void previewQuery() {
