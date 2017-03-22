@@ -56,6 +56,27 @@
 				<apex:commandButton value="Update"  action="{!updateBatch}" />
 				<apex:commandButton value="Preview query" action="{!previewQueryUpdate}" />
 			</apex:pageBlockSection>
+			<apex:pageBlockSection title="Update sObject Records by Copy Field">
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="sObject Name" />
+					<apex:inputText value="{!sObjectSetCopy}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="WHERE Clause" />
+					<apex:inputText value="{!whereClauseSetCopy}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="Origin Field API Name" />
+					<apex:inputText value="{!originField}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="Target Field API Name" />
+					<apex:inputText value="{!fieldToSetCopy}" />
+				</apex:pageBlockSectionItem>			
+				<apex:pageBlockSectionItem >
+				</apex:pageBlockSectionItem>
+				<apex:commandButton value="Update"  action="{!setCopyBatch}" />
+			</apex:pageBlockSection>			
 		</apex:pageBlock>
 	</apex:form>
 </apex:page>

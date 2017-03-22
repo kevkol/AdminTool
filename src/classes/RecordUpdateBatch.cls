@@ -78,7 +78,22 @@ global without sharing class RecordUpdateBatch implements Database.Batchable<sOb
 
 						for (String field : this.fieldsToSetMap.keySet()) {
 
-							obj.put(field, this.fieldsToSetMap.get(field));
+							String fieldType = String.valueOf(obj.getSObjectType().getDescribe().fields.getMap().get(field).getDescribe().getType());
+							System.debug(' fieldType ' + fieldType);
+							
+							if(fieldType == 'STRING') {
+
+								obj.put(field, this.fieldsToSetMap.get(field));
+							} else if (fieldType == 'BOOLEAN') {
+
+								if(String.valueOf(this.fieldsToSetMap.get(field)).toLowerCase() == 'true') {
+									
+									obj.put(field, true);
+								} else {
+
+									obj.put(field, false);
+								}
+							}
 						}
 					} else if (this.fieldToSetCopy != null && this.originField != null) {
 
