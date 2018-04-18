@@ -51,7 +51,7 @@ public with sharing class AdminToolCtr {
 
 	public void setCopyBatch() {
 
-		Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseUpdate));
+		Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseSetCopy));
 		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Copy Field Update initialized.'));
 	}
 
