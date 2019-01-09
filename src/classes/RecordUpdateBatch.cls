@@ -5,10 +5,10 @@
  * @version 	2016-07-15  	kevin.kolditz@die-interaktiven.de 	initial version
  */
 global without sharing class RecordUpdateBatch implements Database.Batchable<sObject> {
-
+	
 	// API Name of related sObject for dynamic query e.g. SCRM_Node__c
 	global String sObjectAPIName { get; set; }
-
+	
 	// additional filtering for query 
 	global String whereCondition { get; set; }
 
@@ -21,31 +21,36 @@ global without sharing class RecordUpdateBatch implements Database.Batchable<sOb
 	// the field with the origin value
 	global String originField { get; set; }
 
+	// the field with the origin value
+	global Boolean allOrNone { get; set; }
+	
 	global RecordUpdateBatch(String sObjectAPIName, Map<String, Object> fieldsToSetMap) {
 
 		this.sObjectAPIName = sObjectAPIName;
 		this.fieldsToSetMap = fieldsToSetMap;
-	}
+	}	
 
-	global RecordUpdateBatch(String sObjectAPIName, String originField, String fieldToSetCopy, String whereCondition) {
+	global RecordUpdateBatch(String sObjectAPIName, String originField, String fieldToSetCopy, String whereCondition, Boolean allOrNone) {
 
 		this.fieldToSetCopy = fieldToSetCopy;
 		this.originField 	= originField;
 		this.sObjectAPIName = sObjectAPIName;
 		this.whereCondition = whereCondition;
+		this.allOrNone = allOrNone;
 
-	}
+	}	
 
-	global RecordUpdateBatch(String sObjectAPIName, String whereCondition, Map<String, Object> fieldsToSetMap) {
+	global RecordUpdateBatch(String sObjectAPIName, String whereCondition, Map<String, Object> fieldsToSetMap, Boolean allOrNone) {
 
 		this.sObjectAPIName 	= sObjectAPIName;
 		this.whereCondition 	= whereCondition;
 		this.fieldsToSetMap 	= fieldsToSetMap;
+		this.allOrNone = allOrNone;
 	}
-
+	
 	global Database.QueryLocator start(Database.BatchableContext BC) {
 
-		String query = 'SELECT Id ';
+		String query = 'SELECT Id '; 
 
 		if (this.originField != null) {
 
@@ -53,7 +58,7 @@ global without sharing class RecordUpdateBatch implements Database.Batchable<sOb
 		}
 
 		query += ' FROM ' + this.sObjectAPIName;
-
+        
 		if (this.whereCondition != null && this.whereCondition != '') {
 			System.debug('this.whereCondition  ' + this.whereCondition);
 			query += ' WHERE ' + this.whereCondition;
@@ -67,72 +72,72 @@ global without sharing class RecordUpdateBatch implements Database.Batchable<sOb
 
 		return Database.getQueryLocator(query);
 	}
-
+	
 	global void execute(Database.BatchableContext BC, List<sObject> scope) {
 		try {
-
-			//if (this.fieldsToSetMap != null && !this.fieldsToSetMap.isEmpty()) {
-			for (sObject obj : scope) {
-				// set all relevant fields
-
-				System.debug('this.fieldsToSetMap  ' + this.fieldsToSetMap);
-				System.debug('this.fieldToSetCopy  ' + this.fieldToSetCopy);
-				System.debug('this.originField  ' + this.originField);
-
-				if(this.fieldsToSetMap != null) {
-
-					for (String field : this.fieldsToSetMap.keySet()) {
-
-						String fieldType = String.valueOf(obj.getSObjectType().getDescribe().fields.getMap().get(field).getDescribe().getType());
-						System.debug(' fieldType ' + fieldType);
-
-						if(fieldType == 'STRING') {
-
-							obj.put(field, this.fieldsToSetMap.get(field));
-						} else if (fieldType == 'BOOLEAN') {
-
-							if(String.valueOf(this.fieldsToSetMap.get(field)).toLowerCase() == 'true') {
-
-								obj.put(field, true);
-							} else {
-
-								obj.put(field, false);
-							}
-						}
-					}
-				} else if (this.fieldToSetCopy != null && this.originField != null) {
-
+			
+				//if (this.fieldsToSetMap != null && !this.fieldsToSetMap.isEmpty()) {
+				for (sObject obj : scope) {
+					// set all relevant fields
+					
+					System.debug('this.fieldsToSetMap  ' + this.fieldsToSetMap);
 					System.debug('this.fieldToSetCopy  ' + this.fieldToSetCopy);
 					System.debug('this.originField  ' + this.originField);
 
-					if(!this.originField.contains('.')) {
+					if(this.fieldsToSetMap != null) {
 
-						obj.put(this.fieldToSetCopy, obj.get(this.originField));
-					} else {
+						for (String field : this.fieldsToSetMap.keySet()) {
 
-						List<String> fieldList = this.originField.split('\\.');
-						System.debug('fieldList  ' + fieldList);
-						sObject testObj = obj.getSObject(fieldList[0]);
-						System.debug('testObj  ' + testObj);
-						obj.put(this.fieldToSetCopy, testObj.get(fieldList[1]));
+							String fieldType = String.valueOf(obj.getSObjectType().getDescribe().fields.getMap().get(field).getDescribe().getType());
+							System.debug(' fieldType ' + fieldType);
+							
+							if(fieldType == 'STRING') {
+
+								obj.put(field, this.fieldsToSetMap.get(field));
+							} else if (fieldType == 'BOOLEAN') {
+
+								if(String.valueOf(this.fieldsToSetMap.get(field)).toLowerCase() == 'true') {
+									
+									obj.put(field, true);
+								} else {
+
+									obj.put(field, false);
+								}
+							}
+						}
+					} else if (this.fieldToSetCopy != null && this.originField != null) {
+
+						System.debug('this.fieldToSetCopy  ' + this.fieldToSetCopy);
+						System.debug('this.originField  ' + this.originField);
+
+						if(!this.originField.contains('.')) {
+
+							obj.put(this.fieldToSetCopy, obj.get(this.originField));
+						} else {
+
+							List<String> fieldList = this.originField.split('\\.');
+							System.debug('fieldList  ' + fieldList);
+							sObject testObj = obj.getSObject(fieldList[0]);
+							System.debug('testObj  ' + testObj);
+							obj.put(this.fieldToSetCopy, testObj.get(fieldList[1]));
+						}
 					}
 				}
-			}
-			//}
+				//}
+				System.debug('this.allOrNone  ' + this.allOrNone);
+				Database.update(scope,this.allOrNone);
 
-			update scope;
+			} catch (Exception e) {
 
-		} catch (Exception e) {
-
-			// Include lines if logUtil is installed
-			// LogUtil log = new LogUtil();
-			// log.warn('RecordUpdateBatch', 'Error in execute method', e);
-		}
+				// Include lines if logUtil is installed
+				// LogUtil log = new LogUtil();
+				// log.warn('RecordUpdateBatch', 'Error in execute method', e);
+		    }
 	}
-
+	
 	global void finish(Database.BatchableContext BC) {
-
-		System.debug('Batch Job Finished');
+		
+		System.debug('Batch Job Finished'); 
 	}
-
+	
 }

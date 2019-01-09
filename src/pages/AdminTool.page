@@ -49,6 +49,12 @@
 					<apex:inputText value="{!newValue}" />
 				</apex:pageBlockSectionItem>
 				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="All Or None" />
+					<apex:inputCheckbox value="{!allOrNone}" />
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
 					<apex:outputText value="{!previewQueryStringUpdate}" />
 				</apex:pageBlockSectionItem>				
 				<apex:pageBlockSectionItem >
@@ -74,9 +80,11 @@
 					<apex:inputText value="{!fieldToSetCopy}" />
 				</apex:pageBlockSectionItem>			
 				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="All Or None" />
+					<apex:inputCheckbox value="{!allOrNoneSetCopy}" />
 				</apex:pageBlockSectionItem>
 				<apex:commandButton value="Update"  action="{!setCopyBatch}" />
-			</apex:pageBlockSection>			
+			</apex:pageBlockSection>
 		</apex:pageBlock>
 	</apex:form>
 </apex:page>
