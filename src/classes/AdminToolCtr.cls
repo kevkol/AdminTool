@@ -21,16 +21,20 @@ public with sharing class AdminToolCtr {
 	public String fieldToUpdate { get; set; }
 	public Object newValue { get; set; }
 	public Boolean allOrNone { get; set; }
+	public Integer batchSize { get; set; }
 
 	public String sObjectSetCopy { get; set; }
 	public String originField { get; set; }
 	public String fieldToSetCopy { get; set; }
 	public String whereClauseSetCopy { get; set; }
 	public Boolean allOrNoneSetCopy { get; set; }
+	public Integer batchSizeSetCopy { get; set; }
 
 	public AdminToolCtr() {
 		this.allOrNone = true;
 		this.allOrNoneSetCopy = true;
+		this.batchSize = 200;
+		this.batchSizeSetCopy = 200;
 	}
 
 	public void deleteBatch() {
@@ -47,13 +51,13 @@ public with sharing class AdminToolCtr {
 			fieldValueMap.put(fieldToUpdate,newValue);
 		}
 
-		Database.executeBatch(new RecordUpdateBatch(sObjectNameUpdate, whereClauseUpdate, fieldValueMap, allOrNone));
+		Database.executeBatch(new RecordUpdateBatch(sObjectNameUpdate, whereClauseUpdate, fieldValueMap, allOrNone),this.batchSize);
 		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Update initialized.'));
 	}
 
 	public void setCopyBatch() {
 
-		Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseSetCopy, allOrNoneSetCopy));
+		Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseSetCopy, allOrNoneSetCopy),this.batchSIzeSetCopy);
 		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Copy Field Update initialized.'));
 	}
 
