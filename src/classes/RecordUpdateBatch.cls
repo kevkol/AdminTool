@@ -1,143 +1,88 @@
 /**
  * This Batch Job is able to mass update records of a sObject. The records are selected by a sObject API name and an optional
- * where clause. 
- * 
- * @version 	2016-07-15  	kevin.kolditz@die-interaktiven.de 	initial version
+ * where clause.
+ *
+ * @version     2023-07-08  Updated version with improvements
  */
-global without sharing class RecordUpdateBatch implements Database.Batchable<sObject> {
-	
-	// API Name of related sObject for dynamic query e.g. SCRM_Node__c
-	global String sObjectAPIName { get; set; }
-	
-	// additional filtering for query 
-	global String whereCondition { get; set; }
+global with sharing class RecordUpdateBatch implements Database.Batchable<sObject>, Database.Stateful {
 
-	// a map with the field name and the value that has to be set
-	global Map<String, Object> fieldsToSetMap { get; set; }
+    private final String sObjectAPIName;
+    private final String whereCondition;
+    private final Map<String, Object> fieldsToSetMap;
+    private final String fieldToSetCopy;
+    private final String originField;
+    private final Boolean allOrNone;
+    private Integer recordsProcessed = 0;
+    private final Integer batchSize;
 
-	// the field that has to be copied
-	global String fieldToSetCopy { get; set; }
+    global RecordUpdateBatch(String sObjectAPIName, String whereCondition, Map<String, Object> fieldsToSetMap, Boolean allOrNone, Integer batchSize) {
+        this.sObjectAPIName = sObjectAPIName;
+        this.whereCondition = whereCondition;
+        this.fieldsToSetMap = fieldsToSetMap;
+        this.fieldToSetCopy = null;
+        this.originField = null;
+        this.allOrNone = allOrNone;
+        this.batchSize = batchSize > 0 ? batchSize : 200;
+    }
 
-	// the field with the origin value
-	global String originField { get; set; }
+    global RecordUpdateBatch(String sObjectAPIName, String originField, String fieldToSetCopy, String whereCondition, Boolean allOrNone, Integer batchSize) {
+        this.sObjectAPIName = sObjectAPIName;
+        this.whereCondition = whereCondition;
+        this.fieldsToSetMap = null;
+        this.fieldToSetCopy = fieldToSetCopy;
+        this.originField = originField;
+        this.allOrNone = allOrNone;
+        this.batchSize = batchSize > 0 ? batchSize : 200;
+    }
 
-	// the field with the origin value
-	global Boolean allOrNone { get; set; }
-	
-	global RecordUpdateBatch(String sObjectAPIName, Map<String, Object> fieldsToSetMap) {
+    global Database.QueryLocator start(Database.BatchableContext BC) {
+        Set<String> fieldsToQuery = new Set<String>{'Id'};
+        if (String.isNotBlank(this.originField)) {
+            fieldsToQuery.add(this.originField);
+        }
 
-		this.sObjectAPIName = sObjectAPIName;
-		this.fieldsToSetMap = fieldsToSetMap;
-	}	
+        String query = 'SELECT ' + String.join(new List<String>(fieldsToQuery), ', ') +
+                       ' FROM ' + String.escapeSingleQuotes(this.sObjectAPIName);
 
-	global RecordUpdateBatch(String sObjectAPIName, String originField, String fieldToSetCopy, String whereCondition, Boolean allOrNone) {
+        if (String.isNotBlank(this.whereCondition)) {
+            query += ' WHERE ' + this.whereCondition;
+        }
 
-		this.fieldToSetCopy = fieldToSetCopy;
-		this.originField 	= originField;
-		this.sObjectAPIName = sObjectAPIName;
-		this.whereCondition = whereCondition;
-		this.allOrNone = allOrNone;
+        if (Test.isRunningTest()) {
+            query += ' LIMIT 10';
+        }
 
-	}	
+        System.debug(LoggingLevel.DEBUG, 'Batch Job Query: ' + query);
 
-	global RecordUpdateBatch(String sObjectAPIName, String whereCondition, Map<String, Object> fieldsToSetMap, Boolean allOrNone) {
+        return Database.getQueryLocator(query);
+    }
 
-		this.sObjectAPIName 	= sObjectAPIName;
-		this.whereCondition 	= whereCondition;
-		this.fieldsToSetMap 	= fieldsToSetMap;
-		this.allOrNone = allOrNone;
-	}
-	
-	global Database.QueryLocator start(Database.BatchableContext BC) {
+    global void execute(Database.BatchableContext BC, List<sObject> scope) {
+        try {
+            List<sObject> recordsToUpdate = new List<sObject>();
 
-		String query = 'SELECT Id '; 
+            for (sObject obj : scope) {
+                if (this.fieldsToSetMap != null) {
+                    for (String field : this.fieldsToSetMap.keySet()) {
+                        obj.put(field, this.fieldsToSetMap.get(field));
+                    }
+                } else if (String.isNotBlank(this.fieldToSetCopy) && String.isNotBlank(this.originField)) {
+                    Object valueToSet = obj.get(this.originField);
+                    obj.put(this.fieldToSetCopy, valueToSet);
+                }
+                recordsToUpdate.add(obj);
+            }
 
-		if (this.originField != null) {
+            if (!recordsToUpdate.isEmpty()) {
+                List<Database.SaveResult> results = Database.update(recordsToUpdate, this.allOrNone);
+                recordsProcessed += results.size();
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.ERROR, 'Batch Job Exception: ' + e.getMessage());
+        }
+    }
 
-			query += ', ' + this.originField;
-		}
-
-		query += ' FROM ' + this.sObjectAPIName;
-        
-		if (this.whereCondition != null && this.whereCondition != '') {
-			System.debug('this.whereCondition  ' + this.whereCondition);
-			query += ' WHERE ' + this.whereCondition;
-		}
-
-		if (Test.isRunningTest()) {
-			query += ' limit 10';
-		}
-
-		System.debug('Batch Job Query:  ' + query);
-
-		return Database.getQueryLocator(query);
-	}
-	
-	global void execute(Database.BatchableContext BC, List<sObject> scope) {
-		try {
-			
-				//if (this.fieldsToSetMap != null && !this.fieldsToSetMap.isEmpty()) {
-				for (sObject obj : scope) {
-					// set all relevant fields
-					
-					System.debug('this.fieldsToSetMap  ' + this.fieldsToSetMap);
-					System.debug('this.fieldToSetCopy  ' + this.fieldToSetCopy);
-					System.debug('this.originField  ' + this.originField);
-
-					if(this.fieldsToSetMap != null) {
-
-						for (String field : this.fieldsToSetMap.keySet()) {
-
-							String fieldType = String.valueOf(obj.getSObjectType().getDescribe().fields.getMap().get(field).getDescribe().getType());
-							System.debug(' fieldType ' + fieldType);
-							
-							if(fieldType == 'STRING') {
-
-								obj.put(field, this.fieldsToSetMap.get(field));
-							} else if (fieldType == 'BOOLEAN') {
-
-								if(String.valueOf(this.fieldsToSetMap.get(field)).toLowerCase() == 'true') {
-									
-									obj.put(field, true);
-								} else {
-
-									obj.put(field, false);
-								}
-							}
-						}
-					} else if (this.fieldToSetCopy != null && this.originField != null) {
-
-						System.debug('this.fieldToSetCopy  ' + this.fieldToSetCopy);
-						System.debug('this.originField  ' + this.originField);
-
-						if(!this.originField.contains('.')) {
-
-							obj.put(this.fieldToSetCopy, obj.get(this.originField));
-						} else {
-
-							List<String> fieldList = this.originField.split('\\.');
-							System.debug('fieldList  ' + fieldList);
-							sObject testObj = obj.getSObject(fieldList[0]);
-							System.debug('testObj  ' + testObj);
-							obj.put(this.fieldToSetCopy, testObj.get(fieldList[1]));
-						}
-					}
-				}
-				//}
-				System.debug('this.allOrNone  ' + this.allOrNone);
-				Database.update(scope,this.allOrNone);
-
-			} catch (Exception e) {
-
-				// Include lines if logUtil is installed
-				// LogUtil log = new LogUtil();
-				// log.warn('RecordUpdateBatch', 'Error in execute method', e);
-		    }
-	}
-	
-	global void finish(Database.BatchableContext BC) {
-		
-		System.debug('Batch Job Finished'); 
-	}
-	
+    global void finish(Database.BatchableContext BC) {
+        System.debug(LoggingLevel.INFO, 'Batch Job Finished. Total records processed: ' + recordsProcessed);
+    }
 }

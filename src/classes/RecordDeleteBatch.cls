@@ -1,64 +1,42 @@
-/**
- * This Batch Job deletes records of a sObject. The records are selected by a sObject API name and an optional
- * where clause. 
- * 
- * @version 	2016-06-14  	kevin.kolditz@die-interaktiven.de 	initial version
- */
-global without sharing class RecordDeleteBatch implements Database.Batchable<sObject> {
-	
-	/** API Name of related sObject for dynamic query e.g. SCRM_Node__c */
-	global String sObjectAPIName { get; set; }
-	
-	/** additional filtering for query */
-	global String whereCondition { get; set; }
-	
-	global RecordDeleteBatch(String sObjectAPIName) {
+global with sharing class RecordDeleteBatch implements Database.Batchable<sObject>, Database.Stateful {
 
-		this.sObjectAPIName 	= sObjectAPIName;
-		this.whereCondition 	= null;
-	}	
+    private final String sObjectAPIName;
+    private final String whereCondition;
+    private Integer recordsProcessed = 0;
+    private final Integer batchSize;
 
-	global RecordDeleteBatch(String sObjectAPIName, String whereCondition) {
+    global RecordDeleteBatch(String sObjectAPIName, String whereCondition, Integer batchSize) {
+        this.sObjectAPIName = sObjectAPIName;
+        this.whereCondition = whereCondition;
+        this.batchSize = batchSize > 0 ? batchSize : 200;
+    }
 
-		this.sObjectAPIName 	= sObjectAPIName;
-		this.whereCondition 	= whereCondition;
-	}
-	
-	/** START method */
-	global Database.QueryLocator start(Database.BatchableContext BC) {
+    global Database.QueryLocator start(Database.BatchableContext BC) {
+        String query = 'SELECT Id FROM ' + String.escapeSingleQuotes(this.sObjectAPIName);
 
-		String query = 'SELECT Id FROM ' + this.sObjectAPIName;
-        
-		if (this.whereCondition != null && this.whereCondition != '') {
-			System.debug('this.whereCondition  ' + this.whereCondition);
-			query += ' WHERE ' + this.whereCondition;
-		}
+        if (String.isNotBlank(this.whereCondition)) {
+            query += ' WHERE ' + this.whereCondition;
+        }
 
+        if (Test.isRunningTest()) {
+            query += ' LIMIT 10';
+        }
 
-		if (Test.isRunningTest()) {
-			query += ' limit 10';
-		}
+        System.debug(LoggingLevel.DEBUG, 'Batch Job Query: ' + query);
 
-		System.debug('Batch Job Query:  ' + query);
+        return Database.getQueryLocator(query);
+    }
 
-		return Database.getQueryLocator(query);
-	}
-	
-	/** EXECUTE method */
-	global void execute(Database.BatchableContext BC, List<sObject> scope) {
-		try {
-			
-			delete scope;
-		} catch (Exception e) {
-			
-			System.debug('Batch Job Exception: ' + e.getMessage()); 
-		}
-	}
-	
-	/** FINISH method */
-	global void finish(Database.BatchableContext BC) {
-		
-		System.debug('Batch Job Finished'); 
-	}
-	
+    global void execute(Database.BatchableContext BC, List<sObject> scope) {
+        try {
+            delete scope;
+            recordsProcessed += scope.size();
+        } catch (Exception e) {
+            System.debug(LoggingLevel.ERROR, 'Batch Job Exception: ' + e.getMessage());
+        }
+    }
+
+    global void finish(Database.BatchableContext BC) {
+        System.debug(LoggingLevel.INFO, 'Batch Job Finished. Total records processed: ' + recordsProcessed);
+    }
 }

@@ -1,88 +1,217 @@
-/**
- * Administation tool for database operations.
- *
- * @see         AdminTool.page
- *
- * @version     2016-07-06 kevin.kolditz@die-interaktiven.de      first version
- * 			    
- */	
-
 public with sharing class AdminToolCtr {
+    // Constants
+    private static final Integer DEFAULT_BATCH_SIZE = 200;
+    private static final Integer MAX_BATCH_SIZE = 2000;
+    private static final Integer MAX_LIST_SIZE = 1000;
+
+    // Properties for Delete operation
+    public String sObjectName { get; set; }
+    public String whereClause { get; set; }
+    public String previewQueryString { get; set; }
+
+    // Properties for Update operation
+    public String sObjectNameUpdate { get; set; }
+    public String whereClauseUpdate { get; set; }
+    public String previewQueryStringUpdate { get; set; }
+    public String fieldToUpdate { get; set; }
+    public String newValue { get; set; }
+    public Boolean allOrNone { get; set; }
+    public Integer batchSize { get; set; }
+
+    // Properties for Copy Field operation
+    public String sObjectSetCopy { get; set; }
+    public String originField { get; set; }
+    public String fieldToSetCopy { get; set; }
+    public String whereClauseSetCopy { get; set; }
+    public Boolean allOrNoneSetCopy { get; set; }
+    public Integer batchSizeSetCopy { get; set; }
+
+    // Property for available SObjects and Fields
+    public List<SelectOption> availableSObjects { get; set; }
+    public List<SelectOption> availableFields { get; set; }
+    public List<SelectOption> availableFieldsForCopy { get; set; }
 
 
-	public String sObjectName { get; set; }
-	public String whereClause { get; set; }
-	public String previewQueryString { get; set; }
+    public AdminToolCtr() {
+        this.allOrNone = true;
+        this.allOrNoneSetCopy = true;
+        this.batchSize = DEFAULT_BATCH_SIZE;
+        this.batchSizeSetCopy = DEFAULT_BATCH_SIZE;
+        loadAvailableSObjects();
+    }
 
-	public String sObjectNameUpdate { get; set; }
-	public String whereClauseUpdate { get; set; }
-	public String previewQueryStringUpdate { get; set; }
+    public void loadAvailableSObjects() {
+        availableSObjects = new List<SelectOption>();
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        List<String> sortedSObjectNames = new List<String>(globalDescribe.keySet());
+        sortedSObjectNames.sort();
 
-	public String fieldToUpdate { get; set; }
-	public Object newValue { get; set; }
-	public Boolean allOrNone { get; set; }
-	public Integer batchSize { get; set; }
+        for(String objName : sortedSObjectNames) {
+            if(availableSObjects.size() >= MAX_LIST_SIZE) break;
+            Schema.SObjectType objType = globalDescribe.get(objName);
+            Schema.DescribeSObjectResult describe = objType.getDescribe();
+            if(describe.isAccessible() && describe.isQueryable()) {
+                availableSObjects.add(new SelectOption(objName, describe.getLabel()));
+            }
+        }
+    }
 
-	public String sObjectSetCopy { get; set; }
-	public String originField { get; set; }
-	public String fieldToSetCopy { get; set; }
-	public String whereClauseSetCopy { get; set; }
-	public Boolean allOrNoneSetCopy { get; set; }
-	public Integer batchSizeSetCopy { get; set; }
+    public void loadAvailableFields() {
+        availableFields = getFieldOptions(sObjectNameUpdate);
+    }
 
-	public AdminToolCtr() {
-		this.allOrNone = true;
-		this.allOrNoneSetCopy = true;
-		this.batchSize = 200;
-		this.batchSizeSetCopy = 200;
-	}
+    public void loadAvailableFieldsForCopy() {
+        availableFieldsForCopy = getFieldOptions(sObjectSetCopy);
+    }
 
-	public void deleteBatch() {
+    @RemoteAction
+    public static List<String> loadAvailableFieldsRemote(String sObjectName) {
+        System.debug('Entering static loadAvailableFieldsRemote method');
+        List<String> fieldNames = getFieldNames(sObjectName);
+        System.debug('Available fields: ' + fieldNames);
+        System.debug('Exiting static loadAvailableFieldsRemote method');
+        return fieldNames;
+    }
 
-		Database.executeBatch(new RecordDeleteBatch(sObjectName, whereClause));
-		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Deletion initialized.'));
-	}
+    private static List<String> getFieldNames(String sObjectName) {
+        List<String> fieldNames = new List<String>();
+        if (String.isNotBlank(sObjectName)) {
+            Schema.SObjectType objType = Schema.getGlobalDescribe().get(sObjectName);
+            if (objType != null) {
+                Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
+                fieldNames = new List<String>(fieldMap.keySet());
+                fieldNames.sort();
+            }
+        }
+        return fieldNames;
+    }
 
-	public void updateBatch() {
+    private static List<SelectOption> getFieldOptions(String sObjectName) {
+        List<SelectOption> fieldOptions = new List<SelectOption>();
+        if (String.isNotBlank(sObjectName)) {
+            Schema.SObjectType objType = Schema.getGlobalDescribe().get(sObjectName);
+            if (objType != null) {
+                Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
+                List<String> sortedApiNames = new List<String>(fieldMap.keySet());
+                sortedApiNames.sort();
+                for (String fieldName : sortedApiNames) {
+                    Schema.DescribeFieldResult fieldDescribe = fieldMap.get(fieldName).getDescribe();
+                    String apiName = fieldDescribe.getName();
+                    String label = fieldDescribe.getLabel();
+                    fieldOptions.add(new SelectOption(apiName, apiName + ' (' + label + ')'));
+                }
+            }
+        }
+        return fieldOptions;
+    }
 
-		Map<String, Object> fieldValueMap = new Map<String, Object> ();
-		if (fieldToUpdate != null && fieldToUpdate != '') {
-			
-			fieldValueMap.put(fieldToUpdate,newValue);
-		}
 
-		Database.executeBatch(new RecordUpdateBatch(sObjectNameUpdate, whereClauseUpdate, fieldValueMap, allOrNone),this.batchSize);
-		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Update initialized.'));
-	}
+    public void deleteBatch() {
+        try {
+            validateInput(sObjectName, 'sObject Name is required for delete operation.');
+            Integer batchSizeToUse = validateBatchSize(batchSize);
+            Database.executeBatch(new RecordDeleteBatch(sObjectName, whereClause, batchSizeToUse), batchSizeToUse);
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.INFO, 'Deletion initialized.'));
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Error initializing deletion: ' + e.getMessage()));
+        }
+    }
 
-	public void setCopyBatch() {
+    public void updateBatch() {
+        try {
+            validateInput(sObjectNameUpdate, 'sObject Name is required for update operation.');
+            validateInput(fieldToUpdate, 'Field to update is required.');
+            Integer batchSizeToUse = validateBatchSize(batchSize);
+            Map<String, Object> fieldValueMap = new Map<String, Object>{fieldToUpdate => newValue};
+            Database.executeBatch(new RecordUpdateBatch(sObjectNameUpdate, whereClauseUpdate, fieldValueMap, allOrNone, batchSizeToUse), batchSizeToUse);
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.INFO, 'Update initialized.'));
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Error initializing update: ' + e.getMessage()));
+        }
+    }
 
-		Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseSetCopy, allOrNoneSetCopy),this.batchSIzeSetCopy);
-		ApexPages.addMessage(new ApexPages.message(ApexPages.Severity.Info, 'Copy Field Update initialized.'));
-	}
+    public void setCopyBatch() {
+        try {
+            validateInput(sObjectSetCopy, 'sObject Name is required for copy operation.');
+            validateInput(originField, 'Origin Field is required.');
+            validateInput(fieldToSetCopy, 'Target Field is required.');
+            Integer batchSizeToUse = validateBatchSize(batchSizeSetCopy);
+            Database.executeBatch(new RecordUpdateBatch(sObjectSetCopy, originField, fieldToSetCopy, whereClauseSetCopy, allOrNoneSetCopy, batchSizeToUse), batchSizeToUse);
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.INFO, 'Copy Field Update initialized.'));
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Error initializing copy field update: ' + e.getMessage()));
+        }
+    }
 
-	public void previewQuery() {
+    public void previewQuery() {
+        this.previewQueryString = buildQuery(this.sObjectName, this.whereClause);
+    }
 
-		String query = 'SELECT Id FROM ' + this.sObjectName;
-        
-		if (this.whereClause != null && this.whereClause.length() > 0) {
+    public void previewQueryUpdate() {
+        System.debug('Entering previewQueryUpdate method');
+        System.debug('sObjectNameUpdate: ' + sObjectNameUpdate);
+        System.debug('fieldToUpdate: ' + fieldToUpdate);
+        System.debug('whereClauseUpdate: ' + whereClauseUpdate);
 
-			query += ' WHERE ' + this.whereClause;
-		}
+        try {
+            if (String.isBlank(sObjectNameUpdate)) {
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Please select an sObject.'));
+                return;
+            }
 
-		this.previewQueryString = query;
-	}
+            if (String.isBlank(fieldToUpdate)) {
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Please select a field to update.'));
+                return;
+            }
 
-	public void previewQueryUpdate() {
+            Schema.SObjectType objType = Schema.getGlobalDescribe().get(sObjectNameUpdate);
+            if (objType == null) {
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Invalid sObject selected.'));
+                return;
+            }
 
-		String query = 'SELECT Id FROM ' + this.sObjectNameUpdate;
-        
-		if (this.whereClauseUpdate != null && this.whereClauseUpdate.length() > 0) {
+            Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
+            String cleanFieldToUpdate = fieldToUpdate.replaceAll('\\s+', ' ').trim();
 
-			query += ' WHERE ' + this.whereClauseUpdate;
-		}
+            if (!fieldMap.containsKey(cleanFieldToUpdate.toLowerCase())) {
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Selected field does not exist for the chosen sObject.'));
+                return;
+            }
 
-		this.previewQueryStringUpdate = query;
-	}
+            this.previewQueryStringUpdate = buildQuery(this.sObjectNameUpdate, this.whereClauseUpdate);
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.INFO, 'Query preview generated successfully.'));
+            System.debug('Query preview: ' + this.previewQueryStringUpdate);
+        } catch (Exception e) {
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Error generating query preview: ' + e.getMessage()));
+            System.debug('Exception in previewQueryUpdate: ' + e.getMessage() + '\n' + e.getStackTraceString());
+        }
 
+        System.debug('Exiting previewQueryUpdate method');
+    }
+
+    private String buildQuery(String objectName, String whereCondition) {
+        validateInput(objectName, 'sObject Name is required for query preview.');
+        String query = 'SELECT Id FROM ' + String.escapeSingleQuotes(objectName);
+        if (String.isNotBlank(whereCondition)) {
+            query += ' WHERE ' + whereCondition;
+        }
+        return query;
+    }
+
+    private void validateInput(String input, String errorMessage) {
+        if (String.isBlank(input)) {
+            throw new AdminToolException(errorMessage);
+        }
+    }
+
+    private Integer validateBatchSize(Integer size) {
+        if (size == null || size <= 0) {
+            return DEFAULT_BATCH_SIZE;
+        } else if (size > MAX_BATCH_SIZE) {
+            return MAX_BATCH_SIZE;
+        }
+        return size;
+    }
+
+    public class AdminToolException extends Exception {}
 }

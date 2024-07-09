@@ -1,96 +1,121 @@
-<!--
- * Visualforce page for the admin tool. The Admin tool helps to control generic ORG methods with 
- * front-end tool.
- *
- * @see         AdminTool.cls
- *
- * @version     2016-07-06 kevin.kolditz@die-interaktiven.com      first version
- * 			    
--->
+<apex:page showHeader="true" sidebar="true" controller="AdminToolCtr" docType="html-5.0">
+    <apex:slds />
+    <apex:form id="adminForm">
+        <apex:pageBlock title="Admin Tool" mode="edit">
+            <apex:pageMessages />
 
-<apex:page showHeader="true" sidebar="true" controller="AdminToolCtr">
-	
-	<apex:form >
-		<apex:pageBlock title="Admin tool" mode="edit">
-			<apex:pageMessages />
-			<apex:pageBlockSection title="Delete sObject Records">
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="sObject Name" />
-					<apex:inputText value="{!sObjectName}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="WHERE Clause" />
-					<apex:inputText value="{!whereClause}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputText value="{!previewQueryString}" />
-				</apex:pageBlockSectionItem>				
-				<apex:pageBlockSectionItem >
-				</apex:pageBlockSectionItem>
-				<apex:commandButton value="Delete"  action="{!deleteBatch}" />
-				<apex:commandButton value="Preview query" action="{!previewQuery}" />
-			</apex:pageBlockSection>
+            <!-- Delete sObject Records Section -->
+            <apex:pageBlockSection title="Delete sObject Records" collapsible="false">
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="sObject Name" for="deleteObjectName"/>
+                    <apex:selectList value="{!sObjectName}" size="1" id="deleteObjectName" styleClass="slds-select">
+                        <apex:selectOptions value="{!availableSObjects}"/>
+                    </apex:selectList>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="WHERE Clause" for="deleteWhereClause"/>
+                    <apex:inputText id="deleteWhereClause" value="{!whereClause}" styleClass="slds-input"/>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputText value="{!previewQueryString}" />
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:commandButton value="Delete" action="{!deleteBatch}" styleClass="slds-button slds-button_destructive" onclick="return confirmDelete();"/>
+                    <apex:commandButton value="Preview Query" action="{!previewQuery}" styleClass="slds-button slds-button_neutral" reRender="adminForm"/>
+                </apex:pageBlockSectionItem>
+            </apex:pageBlockSection>
 
-			<apex:pageBlockSection title="Update sObject Records">
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="sObject Name" />
-					<apex:inputText value="{!sObjectNameUpdate}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="WHERE Clause" />
-					<apex:inputText value="{!whereClauseUpdate}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="Field API Name" />
-					<apex:inputText value="{!fieldToUpdate}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="New value" />
-					<apex:inputText value="{!newValue}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="All Or None" />
-					<apex:inputCheckbox value="{!allOrNone}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="Batch Size" />
-					<apex:inputText value="{!batchSize}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputText value="{!previewQueryStringUpdate}" />
-				</apex:pageBlockSectionItem>				
-				<apex:pageBlockSectionItem >
-				</apex:pageBlockSectionItem>
-				<apex:commandButton value="Update"  action="{!updateBatch}" />
-				<apex:commandButton value="Preview query" action="{!previewQueryUpdate}" />
-			</apex:pageBlockSection>
-			<apex:pageBlockSection title="Update sObject Records by Copy Field">
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="sObject Name" />
-					<apex:inputText value="{!sObjectSetCopy}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="WHERE Clause" />
-					<apex:inputText value="{!whereClauseSetCopy}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="Origin Field API Name" />
-					<apex:inputText value="{!originField}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="Target Field API Name" />
-					<apex:inputText value="{!fieldToSetCopy}" />
-				</apex:pageBlockSectionItem>			
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="All Or None" />
-					<apex:inputCheckbox value="{!allOrNoneSetCopy}" />
-				</apex:pageBlockSectionItem>
-				<apex:pageBlockSectionItem >
-					<apex:outputLabel value="Batch Size" />
-					<apex:inputText value="{!batchSizeSetCopy}" />
-				</apex:pageBlockSectionItem>
-				<apex:commandButton value="Update"  action="{!setCopyBatch}" />
-			</apex:pageBlockSection>
-		</apex:pageBlock>
-	</apex:form>
+            <!-- Update sObject Records Section -->
+            <apex:pageBlockSection title="Update sObject Records" collapsible="false" id="updateSection">
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="sObject Name" for="updateObjectName"/>
+                    <apex:selectList value="{!sObjectNameUpdate}" size="1" id="updateObjectName" styleClass="slds-select">
+                        <apex:selectOptions value="{!availableSObjects}"/>
+                        <apex:actionSupport event="onchange" action="{!loadAvailableFields}" reRender="fieldToUpdate,previewQueryButton"/>
+                    </apex:selectList>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="WHERE Clause" for="updateWhereClause"/>
+                    <apex:inputText id="updateWhereClause" value="{!whereClauseUpdate}" styleClass="slds-input"/>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="Field API Name" for="fieldToUpdate"/>
+                    <apex:selectList value="{!fieldToUpdate}" size="1" id="fieldToUpdate" styleClass="slds-select">
+                        <apex:selectOptions value="{!availableFields}"/>
+                        <apex:actionSupport event="onchange" reRender="previewQueryButton"/>
+                    </apex:selectList>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="New Value" for="newValue"/>
+                    <apex:inputText id="newValue" value="{!newValue}" styleClass="slds-input"/>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="All Or None" for="allOrNone"/>
+                    <apex:inputCheckbox id="allOrNone" value="{!allOrNone}" />
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="Batch Size" for="batchSize"/>
+                    <apex:input type="number" id="batchSize" value="{!batchSize}" styleClass="slds-input" html-min="1" html-max="2000"/>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputText value="{!previewQueryStringUpdate}" />
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:commandButton value="Update" action="{!updateBatch}" styleClass="slds-button slds-button_brand"/>
+                    <apex:commandButton id="previewQueryButton" value="Preview Query" action="{!previewQueryUpdate}" styleClass="slds-button slds-button_neutral" reRender="adminForm" disabled="{!OR(ISBLANK(sObjectNameUpdate), ISBLANK(fieldToUpdate))}"/>
+                </apex:pageBlockSectionItem>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection title="Update sObject Records by Copy Field" collapsible="false">
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="sObject Name" for="copyObjectName"/>
+                    <apex:selectList value="{!sObjectSetCopy}" size="1" id="copyObjectName" styleClass="slds-select">
+                        <apex:selectOptions value="{!availableSObjects}"/>
+                        <apex:actionSupport event="onchange" action="{!loadAvailableFieldsForCopy}" reRender="originField,fieldToSetCopy"/>
+                    </apex:selectList>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="WHERE Clause" for="copyWhereClause"/>
+                    <apex:inputText id="copyWhereClause" value="{!whereClauseSetCopy}" styleClass="slds-input"/>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="Origin Field API Name" for="originField"/>
+                    <apex:selectList value="{!originField}" size="1" id="originField" styleClass="slds-select">
+                        <apex:selectOptions value="{!availableFieldsForCopy}"/>
+                    </apex:selectList>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="Target Field API Name" for="fieldToSetCopy"/>
+                    <apex:selectList value="{!fieldToSetCopy}" size="1" id="fieldToSetCopy" styleClass="slds-select">
+                        <apex:selectOptions value="{!availableFieldsForCopy}"/>
+                    </apex:selectList>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="All Or None" for="allOrNoneSetCopy"/>
+                    <apex:inputCheckbox id="allOrNoneSetCopy" value="{!allOrNoneSetCopy}" />
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="Batch Size" for="batchSizeSetCopy"/>
+                    <apex:input type="number" id="batchSizeSetCopy" value="{!batchSizeSetCopy}" styleClass="slds-input" html-min="1" html-max="2000"/>
+                </apex:pageBlockSectionItem>
+                <apex:pageBlockSectionItem >
+                    <apex:commandButton value="Update" action="{!setCopyBatch}" styleClass="slds-button slds-button_brand"/>
+                </apex:pageBlockSectionItem>
+            </apex:pageBlockSection>
+        </apex:pageBlock>
+    </apex:form>
+
+    <script type="text/javascript">
+        function confirmDelete() {
+            return confirm('Are you sure you want to delete these records? This action cannot be undone.');
+        }
+
+        function debugElementIds() {
+            console.log('updateObjectName found:', !!document.getElementById('{!$Component.adminForm.pageBlock.updateSection.updateObjectName}'));
+            console.log('fieldToUpdate found:', !!document.getElementById('{!$Component.adminForm.pageBlock.updateSection.fieldToUpdate}'));
+        }
+
+        // Call this function when the page loads
+        window.onload = debugElementIds;
+    </script>
 </apex:page>
